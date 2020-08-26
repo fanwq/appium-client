@@ -1,5 +1,7 @@
 import entity.NodeInfo;
+import io.appium.java_client.TouchAction;
 import io.appium.java_client.android.AndroidDriver;
+import io.appium.java_client.touch.offset.PointOption;
 import org.dom4j.*;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.remote.DesiredCapabilities;
@@ -66,15 +68,67 @@ public class AppiumClient {
         }
     }
 
-    private void runIntoMainPage() throws DocumentException {
+    private void runIntoMainPage() throws DocumentException, InterruptedException {
         String pageSource = driver.getPageSource();
         Document document = DocumentHelper.parseText(pageSource);
         Element root = document.getRootElement();
         List<NodeInfo> nodeInfos = new ArrayList<>();
         searchAllElements(root, nodeInfos);
-        System.out.println(nodeInfos.toString());
+        skipProtocol(nodeInfos);
+    }
 
-        int a = 1;
+    private void skipProtocol(List<NodeInfo> nodeInfos) throws InterruptedException {
+        String[] inKeywords = {"同意", "继续"};
+        String[] outKeywords = {"不同意", "退出"};
+        String[] textKeywords = {"协议"};
+
+        boolean isText = false;
+        boolean isInButton = false;
+        for(NodeInfo node : nodeInfos){
+            boolean isOutButton = false;
+            if(node.getText().length() > 15){
+                for(String textKeyword : textKeywords){
+                    if(node.getText().contains(textKeyword)){
+                        isText = true;
+                        break;
+                    }
+                }
+            }else{
+                for(String outKeyword : outKeywords){
+                    if(node.getClickable().equals("true") && node.getText().contains(outKeyword)){
+                        isOutButton = true;
+                        break;
+                    }
+                }
+                if(isOutButton) continue;
+                for(String inKeyword : inKeywords){
+                    if(node.getClickable().equals("true") && node.getText().contains(inKeyword)){
+                        isInButton = true;
+                        break;
+                    }
+                }
+            }
+            if(isText && isInButton){
+                logger.info("识别到用户协议并点击'" + node.getText() + "'");
+                tapUtils(node.getBounds());
+                break;
+            }
+        }
+    }
+
+    private void tapUtils(String boundsString) throws InterruptedException {
+        String[] bounds = boundsString.substring(1, boundsString.length() - 1).replaceAll("]\\[", ",").split(",");
+        int xL = Integer.parseInt(bounds[0]);
+        int yL = Integer.parseInt(bounds[1]);
+        int xR = Integer.parseInt(bounds[2]);
+        int yR = Integer.parseInt(bounds[3]);
+        int xOff = (xL + xR) / 2;
+        int yOff = (yL + yR) / 2;
+        TouchAction action = new TouchAction(driver);
+        PointOption pointOption = new PointOption();
+        pointOption.withCoordinates(xOff,yOff);
+        action.tap(pointOption).perform().release();
+        Thread.sleep(TIME_WAIT_SHORT);
     }
 
     private void givePermission(String pkgName) throws IOException {
