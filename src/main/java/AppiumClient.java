@@ -7,6 +7,7 @@ import org.openqa.selenium.WebElement;
 import org.openqa.selenium.remote.DesiredCapabilities;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import utils.SwipUtils;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
@@ -17,7 +18,7 @@ import java.util.List;
 
 public class AppiumClient {
     private static final Logger logger = LoggerFactory.getLogger(AppiumClient.class);
-    private static final Integer TIME_WAIT_LONG = 3000;
+    private static final Integer TIME_WAIT_LONG = 5000;
     private static final Integer TIME_WAIT_SHORT = 2000;
     private AndroidDriver<WebElement> driver = null;
 
@@ -60,8 +61,8 @@ public class AppiumClient {
         Attribute attr = element.attribute("text");
         if(attr != null){
             String aStr = attr.getValue();
-            if(!aStr.equals("")) {
-                String clickable = element.attributeValue("clickable");
+            String clickable = element.attributeValue("clickable");
+            if(!aStr.equals("") || clickable.equals("true")) {
                 String bounds = element.attributeValue("bounds");
                 nodeInfoList.add(new NodeInfo(aStr, clickable, bounds));
             }
@@ -69,51 +70,66 @@ public class AppiumClient {
     }
 
     private void runIntoMainPage() throws DocumentException, InterruptedException {
+        List<NodeInfo> nodeInfos = parsePageSource();
+        while(!(nodeInfos.size() == 0 || nodeInfos.size() > 7
+                || driver.currentActivity().toLowerCase().contains("login"))){
+            skipProtocol(nodeInfos);
+            nodeInfos = parsePageSource();
+        }
+        while(nodeInfos.size() == 0 || nodeInfos.size() == 1){
+            if(nodeInfos.size() == 0){
+                SwipUtils.SwipeLeft(driver);
+            } else{
+                tapUtils(nodeInfos.get(0).getBounds());
+                Thread.sleep(TIME_WAIT_SHORT);
+            }
+            nodeInfos = parsePageSource();
+        }
+        nodeInfos = parsePageSource();
+        while(!(nodeInfos.size() == 0 || nodeInfos.size() > 7
+                || driver.currentActivity().toLowerCase().contains("login"))){
+            skipProtocol(nodeInfos);
+            nodeInfos = parsePageSource();
+        }
+    }
+
+    private List<NodeInfo> parsePageSource() throws DocumentException {
         String pageSource = driver.getPageSource();
         Document document = DocumentHelper.parseText(pageSource);
         Element root = document.getRootElement();
         List<NodeInfo> nodeInfos = new ArrayList<>();
         searchAllElements(root, nodeInfos);
-        skipProtocol(nodeInfos);
+        return nodeInfos;
     }
 
     private void skipProtocol(List<NodeInfo> nodeInfos) throws InterruptedException {
-        String[] inKeywords = {"同意", "继续"};
+        String[] inKeywords = {"同意", "继续", "知道了", "跳过"};
         String[] outKeywords = {"不同意", "退出"};
-        String[] textKeywords = {"协议"};
-
-        boolean isText = false;
+        // String[] textKeywords = {"协议", "政策", "条款"};
         boolean isInButton = false;
         for(NodeInfo node : nodeInfos){
             boolean isOutButton = false;
-            if(node.getText().length() > 15){
-                for(String textKeyword : textKeywords){
-                    if(node.getText().contains(textKeyword)){
-                        isText = true;
-                        break;
-                    }
-                }
-            }else{
-                for(String outKeyword : outKeywords){
-                    if(node.getClickable().equals("true") && node.getText().contains(outKeyword)){
-                        isOutButton = true;
-                        break;
-                    }
-                }
-                if(isOutButton) continue;
-                for(String inKeyword : inKeywords){
-                    if(node.getClickable().equals("true") && node.getText().contains(inKeyword)){
-                        isInButton = true;
-                        break;
-                    }
+            for(String outKeyword : outKeywords){
+                if(node.getClickable().equals("true") && node.getText().contains(outKeyword)){
+                    isOutButton = true;
+                    break;
                 }
             }
-            if(isText && isInButton){
-                logger.info("识别到用户协议并点击'" + node.getText() + "'");
+            if(isOutButton) continue;
+            for(String inKeyword : inKeywords){
+                if(node.getClickable().equals("true") && node.getText().contains(inKeyword)
+                        && node.getText().length() < 15){
+                    isInButton = true;
+                    break;
+                }
+            }
+            if(isInButton){
+                logger.info("点击'" + node.getText() + "'");
                 tapUtils(node.getBounds());
                 break;
             }
         }
+
     }
 
     private void tapUtils(String boundsString) throws InterruptedException {
