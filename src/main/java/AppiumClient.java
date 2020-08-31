@@ -1,6 +1,8 @@
 import entity.NodeInfo;
 import io.appium.java_client.TouchAction;
 import io.appium.java_client.android.AndroidDriver;
+import io.appium.java_client.android.nativekey.AndroidKey;
+import io.appium.java_client.android.nativekey.KeyEvent;
 import io.appium.java_client.touch.offset.PointOption;
 import org.dom4j.*;
 import org.openqa.selenium.WebElement;
@@ -15,11 +17,10 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 public class AppiumClient {
     private static final Logger logger = LoggerFactory.getLogger(AppiumClient.class);
-    private static final Integer TIME_WAIT_LONG = 5000;
-    private static final Integer TIME_WAIT_SHORT = 2000;
     private AndroidDriver<WebElement> driver = null;
 
     private void connectAppiumServer() throws MalformedURLException {
@@ -30,6 +31,7 @@ public class AppiumClient {
         capabilities.setCapability("platformName", "Android");
         capabilities.setCapability("platformVersion", "10.0");
         driver = new AndroidDriver<>(new URL("http://127.0.0.1:4723/wd/hub"), capabilities);
+        driver.manage().timeouts().implicitlyWait(10, TimeUnit.SECONDS);
         logger.info("连接成功");
     }
 
@@ -47,7 +49,7 @@ public class AppiumClient {
         logger.info("启动" + pkgName1);
         String command = "adb shell monkey -p " + pkgName1 + " -vvv 1";
         Runtime.getRuntime().exec(command);
-        Thread.sleep(TIME_WAIT_LONG);
+        Thread.sleep(5000);
         // 启动页面识别
         runIntoMainPage();
 
@@ -63,38 +65,73 @@ public class AppiumClient {
             String aStr = attr.getValue();
             String clickable = element.attributeValue("clickable");
             if(!aStr.equals("") || clickable.equals("true")) {
+                Attribute resourceId = element.attribute("resource-id");
                 String bounds = element.attributeValue("bounds");
-                nodeInfoList.add(new NodeInfo(aStr, clickable, bounds));
+                if(resourceId != null){
+                    nodeInfoList.add(new NodeInfo(aStr, clickable, bounds, resourceId.getValue()));
+                }else{
+                    nodeInfoList.add(new NodeInfo(aStr, clickable, bounds, ""));
+                }
             }
         }
     }
 
-    private void runIntoMainPage() throws DocumentException, InterruptedException {
+    private void runIntoMainPage() throws DocumentException, InterruptedException, IOException {
         List<NodeInfo> nodeInfos = parsePageSource();
-        while(!(nodeInfos.size() == 0 || nodeInfos.size() > 7
-                || driver.currentActivity().toLowerCase().contains("login"))){
-            skipProtocol(nodeInfos);
-            nodeInfos = parsePageSource();
-        }
+        preSkipProtocol(nodeInfos);
+        nodeInfos = parsePageSource();
         while(nodeInfos.size() == 0 || nodeInfos.size() == 1){
             if(nodeInfos.size() == 0){
                 SwipUtils.SwipeLeft(driver);
             } else{
                 tapUtils(nodeInfos.get(0).getBounds());
-                Thread.sleep(TIME_WAIT_SHORT);
+                break;
             }
             nodeInfos = parsePageSource();
         }
         nodeInfos = parsePageSource();
-        while(!(nodeInfos.size() == 0 || nodeInfos.size() > 7
-                || driver.currentActivity().toLowerCase().contains("login"))){
+        preSkipProtocol(nodeInfos);
+        if(driver.currentActivity().toLowerCase().contains("login")){
+            logger.info("识别到登录页，尝试通过返回键进入主界面");
+            driver.hideKeyboard();
+            String curPkg = driver.getCurrentPackage();
+            driver.pressKey(new KeyEvent(AndroidKey.BACK));
+            if(driver.getCurrentPackage().equals("com.miui.home") && driver.currentActivity().equals(".launcher.Launcher")){
+                logger.info("失败，重新打开app");
+                String command = "adb shell monkey -p " + curPkg + " -vvv 1";
+                Runtime.getRuntime().exec(command);
+            }
+        }
+        nodeInfos = parsePageSource();
+        skipProtocol(nodeInfos);
+        nodeInfos = parsePageSource();
+        skipProtocol(nodeInfos);
+    }
+
+    private void preSkipProtocol(List<NodeInfo> nodeInfos) throws InterruptedException, DocumentException {
+        while(!(nodeInfos.size() == 0 || nodeInfos.size() > 7)){
+            String frontAct = driver.currentActivity();
             skipProtocol(nodeInfos);
+            String backAct = driver.currentActivity();
+            if(frontAct.equals(backAct)) break;
             nodeInfos = parsePageSource();
         }
     }
 
     private List<NodeInfo> parsePageSource() throws DocumentException {
-        String pageSource = driver.getPageSource();
+        String pageSourceOld = driver.getPageSource();
+        String pageSource = null;
+        int count = 0;
+        while(true) {
+            pageSource = driver.getPageSource();
+            if(pageSourceOld.equals(pageSource)){
+                count++;
+            }else{
+                count = 0;
+            }
+            if(count > 10) break;
+            pageSourceOld = pageSource;
+        }
         Document document = DocumentHelper.parseText(pageSource);
         Element root = document.getRootElement();
         List<NodeInfo> nodeInfos = new ArrayList<>();
@@ -103,11 +140,15 @@ public class AppiumClient {
     }
 
     private void skipProtocol(List<NodeInfo> nodeInfos) throws InterruptedException {
-        String[] inKeywords = {"同意", "继续", "知道了", "跳过"};
+        String[] inKeywords = {"同意", "继续", "知道了", "跳过", "逛逛"};
         String[] outKeywords = {"不同意", "退出"};
         // String[] textKeywords = {"协议", "政策", "条款"};
         boolean isInButton = false;
         for(NodeInfo node : nodeInfos){
+            if(node.getResourceId().contains("close")){
+                tapUtils(node.getBounds());
+                break;
+            }
             boolean isOutButton = false;
             for(String outKeyword : outKeywords){
                 if(node.getClickable().equals("true") && node.getText().contains(outKeyword)){
@@ -144,7 +185,6 @@ public class AppiumClient {
         PointOption pointOption = new PointOption();
         pointOption.withCoordinates(xOff,yOff);
         action.tap(pointOption).perform().release();
-        Thread.sleep(TIME_WAIT_SHORT);
     }
 
     private void givePermission(String pkgName) throws IOException {
