@@ -76,9 +76,10 @@ public class AppiumClient {
         }
     }
 
-    private void runIntoMainPage() throws DocumentException, InterruptedException, IOException {
+    private void runIntoMainPage() throws DocumentException, IOException, InterruptedException {
         List<NodeInfo> nodeInfos = parsePageSource();
         preSkipProtocol(nodeInfos);
+        System.out.println("1");
         nodeInfos = parsePageSource();
         while(nodeInfos.size() == 0 || nodeInfos.size() == 1){
             if(nodeInfos.size() == 0){
@@ -87,8 +88,10 @@ public class AppiumClient {
                 tapUtils(nodeInfos.get(0).getBounds());
                 break;
             }
+            System.out.println("2");
             nodeInfos = parsePageSource();
         }
+        System.out.println("3");
         nodeInfos = parsePageSource();
         preSkipProtocol(nodeInfos);
         if(driver.currentActivity().toLowerCase().contains("login")){
@@ -102,13 +105,15 @@ public class AppiumClient {
                 Runtime.getRuntime().exec(command);
             }
         }
-        nodeInfos = parsePageSource();
+        System.out.println("4");
+        nodeInfos = parsePageSourceWithoutDetect();
         skipProtocol(nodeInfos);
-        nodeInfos = parsePageSource();
+        System.out.println("5");
+        nodeInfos = parsePageSourceWithoutDetect();
         skipProtocol(nodeInfos);
     }
 
-    private void preSkipProtocol(List<NodeInfo> nodeInfos) throws InterruptedException, DocumentException {
+    private void preSkipProtocol(List<NodeInfo> nodeInfos) throws DocumentException, InterruptedException {
         while(!(nodeInfos.size() == 0 || nodeInfos.size() > 7)){
             String frontAct = driver.currentActivity();
             skipProtocol(nodeInfos);
@@ -118,19 +123,23 @@ public class AppiumClient {
         }
     }
 
-    private List<NodeInfo> parsePageSource() throws DocumentException {
+    private List<NodeInfo> parsePageSource() throws DocumentException, InterruptedException {
         String pageSourceOld = driver.getPageSource();
         String pageSource = null;
         int count = 0;
+        int timeOutCnt = 0;
         while(true) {
             pageSource = driver.getPageSource();
+            timeOutCnt++;
             if(pageSourceOld.equals(pageSource)){
                 count++;
             }else{
                 count = 0;
             }
-            if(count > 10) break;
+            if(count == 2) break;
+            if(timeOutCnt == 4) break;
             pageSourceOld = pageSource;
+            Thread.sleep(1000);
         }
         Document document = DocumentHelper.parseText(pageSource);
         Element root = document.getRootElement();
@@ -139,7 +148,16 @@ public class AppiumClient {
         return nodeInfos;
     }
 
-    private void skipProtocol(List<NodeInfo> nodeInfos) throws InterruptedException {
+    private List<NodeInfo> parsePageSourceWithoutDetect() throws DocumentException, InterruptedException {
+        String pageSource = driver.getPageSource();
+        Document document = DocumentHelper.parseText(pageSource);
+        Element root = document.getRootElement();
+        List<NodeInfo> nodeInfos = new ArrayList<>();
+        searchAllElements(root, nodeInfos);
+        return nodeInfos;
+    }
+
+    private void skipProtocol(List<NodeInfo> nodeInfos){
         String[] inKeywords = {"同意", "继续", "知道了", "跳过", "逛逛"};
         String[] outKeywords = {"不同意", "退出"};
         // String[] textKeywords = {"协议", "政策", "条款"};
@@ -173,7 +191,7 @@ public class AppiumClient {
 
     }
 
-    private void tapUtils(String boundsString) throws InterruptedException {
+    private void tapUtils(String boundsString) {
         String[] bounds = boundsString.substring(1, boundsString.length() - 1).replaceAll("]\\[", ",").split(",");
         int xL = Integer.parseInt(bounds[0]);
         int yL = Integer.parseInt(bounds[1]);
@@ -196,7 +214,8 @@ public class AppiumClient {
                 "android.permission.ACCESS_COARSE_LOCATION",
                 "android.permission.ACCESS_BACKGROUND_LOCATION",
                 "android.permission.LOCATION_POLICY_INTERNAL",
-                "android.permission.READ_PHONE_STATE"
+                "android.permission.READ_PHONE_STATE",
+                "android.permission.CAMERA"
         };
         for(String permission: permissions){
             Runtime.getRuntime().exec("adb shell pm grant " + pkgName + " " + permission);
