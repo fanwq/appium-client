@@ -30,8 +30,10 @@ public class AppiumClient {
         capabilities.setCapability("automationName", "Appium");
         capabilities.setCapability("platformName", "Android");
         capabilities.setCapability("platformVersion", "10.0");
+        capabilities.setCapability("newCommandTimeout", "600");
+        capabilities.setCapability("automationName", "UiAutomator2");
         driver = new AndroidDriver<>(new URL("http://127.0.0.1:4723/wd/hub"), capabilities);
-        driver.manage().timeouts().implicitlyWait(10, TimeUnit.SECONDS);
+        driver.manage().timeouts().implicitlyWait(3, TimeUnit.SECONDS);
         logger.info("连接成功");
     }
 
@@ -77,23 +79,13 @@ public class AppiumClient {
     }
 
     private void runIntoMainPage() throws DocumentException, IOException, InterruptedException {
-        List<NodeInfo> nodeInfos = parsePageSource();
-        preSkipProtocol(nodeInfos);
         System.out.println("1");
-        nodeInfos = parsePageSource();
-        while(nodeInfos.size() == 0 || nodeInfos.size() == 1){
-            if(nodeInfos.size() == 0){
-                SwipUtils.SwipeLeft(driver);
-            } else{
-                tapUtils(nodeInfos.get(0).getBounds());
-                break;
-            }
-            System.out.println("2");
-            nodeInfos = parsePageSource();
-        }
+        if(!preSkipProtocol()) return;
+        System.out.println("2");
+        swipProduction();
         System.out.println("3");
-        nodeInfos = parsePageSource();
-        preSkipProtocol(nodeInfos);
+        if(!preSkipProtocol()) return;
+        System.out.println("4");
         if(driver.currentActivity().toLowerCase().contains("login")){
             logger.info("识别到登录页，尝试通过返回键进入主界面");
             driver.hideKeyboard();
@@ -105,30 +97,59 @@ public class AppiumClient {
                 Runtime.getRuntime().exec(command);
             }
         }
-        System.out.println("4");
-        nodeInfos = parsePageSourceWithoutDetect();
-        skipProtocol(nodeInfos);
         System.out.println("5");
-        nodeInfos = parsePageSourceWithoutDetect();
-        skipProtocol(nodeInfos);
+        preSkipProtocol();
     }
 
-    private void preSkipProtocol(List<NodeInfo> nodeInfos) throws DocumentException, InterruptedException {
-        while(!(nodeInfos.size() == 0 || nodeInfos.size() > 7)){
-            String frontAct = driver.currentActivity();
-            skipProtocol(nodeInfos);
-            String backAct = driver.currentActivity();
-            if(frontAct.equals(backAct)) break;
+    private void swipProduction() throws InterruptedException, DocumentException {
+        Thread.sleep(3000);
+        List<NodeInfo> nodeInfos = parsePageSourceWithoutDetect();
+        skipProtocol(nodeInfos);
+        while(nodeInfos == null || nodeInfos.size() == 0 || nodeInfos.size() == 1){
+            if(nodeInfos == null || nodeInfos.size() == 0){
+                SwipUtils.SwipeLeft(driver);
+            } else{
+                tapUtils(nodeInfos.get(0).getBounds());
+                break;
+            }
             nodeInfos = parsePageSource();
         }
     }
 
+    private boolean preSkipProtocol() throws DocumentException, InterruptedException {
+        List<NodeInfo> nodeInfos;
+        int count = 0;
+        NodeInfo t_node = null;
+        if((nodeInfos = parsePageSource()) == null)
+            return false;
+        for(NodeInfo node: nodeInfos){
+            if(node.getClickable().equals("true")) {
+                t_node = node;
+                count++;
+            }
+        }
+        if(count == 1) tapUtils(t_node.getBounds());
+        while(nodeInfos.size() <= 7){
+            String frontAct = driver.currentActivity();
+            skipProtocol(nodeInfos);
+            String backAct = driver.currentActivity();
+            if(frontAct.equals(backAct)) break;
+            if((nodeInfos = parsePageSource()) == null)
+                return false;
+        }
+        return true;
+    }
+
     private List<NodeInfo> parsePageSource() throws DocumentException, InterruptedException {
+        long time1 = System.currentTimeMillis();
         String pageSourceOld = driver.getPageSource();
         String pageSource = null;
         int count = 0;
         int timeOutCnt = 0;
         while(true) {
+            long time2 = System.currentTimeMillis();
+            if((time2 - time1) > 5000) return null;
+            time1 = time2;
             pageSource = driver.getPageSource();
             timeOutCnt++;
             if(pageSourceOld.equals(pageSource)){
@@ -137,9 +158,9 @@ public class AppiumClient {
                 count = 0;
             }
             if(count == 2) break;
-            if(timeOutCnt == 4) break;
+            if(timeOutCnt > 4) break;
             pageSourceOld = pageSource;
-            Thread.sleep(1000);
+            Thread.sleep(3000);
         }
         Document document = DocumentHelper.parseText(pageSource);
         Element root = document.getRootElement();
@@ -149,8 +170,7 @@ public class AppiumClient {
     }
 
     private List<NodeInfo> parsePageSourceWithoutDetect() throws DocumentException, InterruptedException {
-        String pageSource = driver.getPageSource();
-        Document document = DocumentHelper.parseText(pageSource);
+        Document document = DocumentHelper.parseText(driver.getPageSource());
         Element root = document.getRootElement();
         List<NodeInfo> nodeInfos = new ArrayList<>();
         searchAllElements(root, nodeInfos);
@@ -164,6 +184,10 @@ public class AppiumClient {
         boolean isInButton = false;
         for(NodeInfo node : nodeInfos){
             if(node.getResourceId().contains("close")){
+                tapUtils(node.getBounds());
+                break;
+            }
+            if(node.getText().equals("跳过")){
                 tapUtils(node.getBounds());
                 break;
             }

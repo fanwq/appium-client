@@ -26,6 +26,13 @@ public class MD5Util {
             e.printStackTrace();
         }
         assert bi != null;
-        return bi.toString(16);
+        StringBuilder biString = new StringBuilder(bi.toString(16));
+        if(biString.length() < 32){
+            int zero_nums = 32 - biString.length();
+            for(int i = 0; i < zero_nums; i++){
+                biString.insert(0, "0");
+            }
+        }
+        return biString.toString();
     }
 }

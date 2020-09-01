@@ -20,6 +20,7 @@ public class Test {
         capabilities.setCapability("platformName", "Android");
         capabilities.setCapability("platformVersion", "10.0");
         driver = new AndroidDriver<>(new URL("http://127.0.0.1:4723/wd/hub"), capabilities);
+        System.out.println(driver.getPageSource());
         Document document = DocumentHelper.parseText(driver.getPageSource());
         Element element = document.getRootElement();
         List<NodeInfo> nodeInfos = new ArrayList<>();
