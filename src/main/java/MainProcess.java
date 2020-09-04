@@ -7,17 +7,17 @@ import java.io.IOException;
 public class MainProcess {
     private static final Logger logger = LoggerFactory.getLogger(MainProcess.class);
     public static void main(String[] args) throws IOException, InterruptedException, DocumentException {
-//        ApkDownloader apkDownloader = new ApkDownloader();
-//        String pkgName = apkDownloader.downloadApk("网上国网");
-//        if(pkgName.equals("")){
-//            logger.error("下载" + pkgName + "失败");
-//            System.exit(-1);
-//        }else{
-//            AppiumClient client = new AppiumClient();
-//            client.run(pkgName);
-//        }
+        ApkDownloader apkDownloader = new ApkDownloader();
+        String pkgName = apkDownloader.downloadApk("平安健康");
+        if(pkgName.equals("")){
+            logger.error("下载" + pkgName + "失败");
+            System.exit(-1);
+        }else{
+            AppiumClient client = new AppiumClient();
+            client.run(pkgName);
+        }
 
-        AppiumClient client = new AppiumClient();
-        client.run("com.wimift.app_2.2.0_28.apk");
+//        AppiumClient client = new AppiumClient();
+//        client.run("com.tencent.news_6.2.30_6230.apk");
     }
 }

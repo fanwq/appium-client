@@ -1,5 +1,8 @@
 import entity.NodeInfo;
+import io.appium.java_client.android.Activity;
 import io.appium.java_client.android.AndroidDriver;
+import io.appium.java_client.android.nativekey.AndroidKey;
+import io.appium.java_client.android.nativekey.KeyEvent;
 import org.dom4j.*;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.remote.DesiredCapabilities;
@@ -23,8 +26,10 @@ public class Test {
         System.out.println(driver.getPageSource());
         Document document = DocumentHelper.parseText(driver.getPageSource());
         Element element = document.getRootElement();
-        List<NodeInfo> nodeInfos = new ArrayList<>();
-        new Test().searchAllElements(element, nodeInfos);
+        String width = element.attributeValue("width");
+        String height = element.attributeValue("height");
+        System.out.println(width + "," + height);
+//        new Test().searchAllElements(element, nodeInfos);
     }
 
 

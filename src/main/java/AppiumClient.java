@@ -1,4 +1,5 @@
 import entity.NodeInfo;
+import entity.Page;
 import io.appium.java_client.TouchAction;
 import io.appium.java_client.android.AndroidDriver;
 import io.appium.java_client.android.nativekey.AndroidKey;
@@ -17,11 +18,15 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Stack;
 import java.util.concurrent.TimeUnit;
 
 public class AppiumClient {
     private static final Logger logger = LoggerFactory.getLogger(AppiumClient.class);
     private AndroidDriver<WebElement> driver = null;
+    private Stack<Page> pageStack = new Stack<>();
+    private String phoneWidth;
+    private String phoneHeight;
 
     private void connectAppiumServer() throws MalformedURLException {
         logger.info("正在连接appiumServer");
@@ -51,10 +56,64 @@ public class AppiumClient {
         logger.info("启动" + pkgName1);
         String command = "adb shell monkey -p " + pkgName1 + " -vvv 1";
         Runtime.getRuntime().exec(command);
-        Thread.sleep(5000);
+        Thread.sleep(3000);
+        Document document = DocumentHelper.parseText(driver.getPageSource());
+        Element root = document.getRootElement();
+        phoneWidth = root.attributeValue("width");
+        phoneHeight = root.attributeValue("height");
         // 启动页面识别
         runIntoMainPage();
+        //主页面识别
+        runMainPage();
 
+    }
+
+    private void runMainPage() throws DocumentException {
+        String curActivity = driver.currentActivity();
+        String curPackage = driver.getCurrentPackage();
+        Document document = DocumentHelper.parseText(driver.getPageSource());
+        List<NodeInfo> nodeInfos = new ArrayList<>();
+        List<String> tabs = new ArrayList<>();
+        searchAllElementsClickable(document.getRootElement(), nodeInfos);
+        List<String> bottomTabs = findBottomTabs(nodeInfos);
+        for(NodeInfo node : nodeInfos){
+            String bounds = node.getBounds();
+            pageStack.push(new Page(curPackage, curActivity, nodeInfos));
+            tapUtils(bounds);
+            if(driver.getCurrentPackage().equals(curPackage) && driver.currentActivity().equals(curActivity)){
+                tabs.add(bounds);
+                continue;
+            }
+            if(pageStack.size() < 3){
+                runMainPage();
+            }else{
+                driver.pressKey(new KeyEvent(AndroidKey.BACK));
+                Page page = pageStack.pop();
+                while(!(driver.getCurrentPackage().equals(page.getPackageName())
+                        && driver.currentActivity().equals(page.getActivityName()))){
+                    driver.pressKey(new KeyEvent(AndroidKey.BACK));
+                }
+            }
+        }
+
+    }
+
+    private List<String> findBottomTabs(List<NodeInfo> nodeInfos){
+        if(nodeInfos == null) return null;
+        List<String> ret = new ArrayList<>();
+        List<NodeInfo> delNodes = new ArrayList<>();
+        for(NodeInfo node : nodeInfos){
+            String[] bounds = node.getBounds().substring(1, node.getBounds().length() - 1).replaceAll("]\\[", ",").split(",");
+            int yOff = (Integer.parseInt(bounds[1]) + Integer.parseInt(bounds[3])) / 2;
+            if(yOff > Integer.parseInt(phoneHeight)){
+                ret.add(node.getBounds());
+                delNodes.add(node);
+            }
+        }
+        for(NodeInfo node: delNodes){
+            nodeInfos.remove(node);
+        }
+        return ret;
     }
 
     private void searchAllElements(Element element, List<NodeInfo> nodeInfoList){
@@ -78,14 +137,21 @@ public class AppiumClient {
         }
     }
 
+    private void searchAllElementsClickable(Element element, List<NodeInfo> nodeInfoList){
+        Iterator itr = element.elementIterator();
+        while(itr.hasNext()){
+            searchAllElements((Element) itr.next(), nodeInfoList);
+        }
+        String clickable = element.attributeValue("clickable");
+        String bounds = element.attributeValue("bounds");
+        if(clickable != null && bounds != null)
+            nodeInfoList.add(new NodeInfo("", clickable, bounds, ""));
+    }
+
     private void runIntoMainPage() throws DocumentException, IOException, InterruptedException {
-        System.out.println("1");
         if(!preSkipProtocol()) return;
-        System.out.println("2");
         swipProduction();
-        System.out.println("3");
         if(!preSkipProtocol()) return;
-        System.out.println("4");
         if(driver.currentActivity().toLowerCase().contains("login")){
             logger.info("识别到登录页，尝试通过返回键进入主界面");
             driver.hideKeyboard();
@@ -97,7 +163,6 @@ public class AppiumClient {
                 Runtime.getRuntime().exec(command);
             }
         }
-        System.out.println("5");
         preSkipProtocol();
     }
 
