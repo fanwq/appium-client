@@ -65,7 +65,7 @@ public class ApkDownloader {
         String filePre = "D:\\appium-apk\\";
         File apkFile = new File(filePre + fileName);
         if(apkFile.exists()){
-            boolean is_del = apkFile.delete();
+            return fileName;
         }
         boolean is_create = apkFile.createNewFile();
         FileOutputStream fileOutputStream = new FileOutputStream(apkFile);

@@ -5,12 +5,12 @@ import java.util.List;
 public class Page {
     private String packageName;
     private String activityName;
-    private List<NodeInfo> nodeInfos;
+    private NodeInfo preNodeInfo;
 
-    public Page(String packageName, String activityName, List<NodeInfo> nodeInfos) {
+    public Page(String packageName, String activityName, NodeInfo preNodeInfo) {
         this.packageName = packageName;
         this.activityName = activityName;
-        this.nodeInfos = nodeInfos;
+        this.preNodeInfo = preNodeInfo;
     }
 
     public String getPackageName() {
@@ -29,11 +29,11 @@ public class Page {
         this.activityName = activityName;
     }
 
-    public List<NodeInfo> getNodeInfos() {
-        return nodeInfos;
+    public NodeInfo getPreNodeInfo() {
+        return preNodeInfo;
     }
 
-    public void setNodeInfos(List<NodeInfo> nodeInfos) {
-        this.nodeInfos = nodeInfos;
+    public void setPreNodeInfo(NodeInfo preNodeInfo) {
+        this.preNodeInfo = preNodeInfo;
     }
 }

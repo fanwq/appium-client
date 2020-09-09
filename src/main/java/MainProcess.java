@@ -8,7 +8,7 @@ public class MainProcess {
     private static final Logger logger = LoggerFactory.getLogger(MainProcess.class);
     public static void main(String[] args) throws IOException, InterruptedException, DocumentException {
         ApkDownloader apkDownloader = new ApkDownloader();
-        String pkgName = apkDownloader.downloadApk("平安健康");
+        String pkgName = apkDownloader.downloadApk("美团");
         if(pkgName.equals("")){
             logger.error("下载" + pkgName + "失败");
             System.exit(-1);

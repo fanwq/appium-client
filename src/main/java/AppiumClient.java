@@ -64,36 +64,46 @@ public class AppiumClient {
         // 启动页面识别
         runIntoMainPage();
         //主页面识别
-        runMainPage();
+        runMainPage(null, 0);
 
     }
 
-    private void runMainPage() throws DocumentException {
+    private void runMainPage(Page prePage, int depth) throws DocumentException {
         String curActivity = driver.currentActivity();
         String curPackage = driver.getCurrentPackage();
         Document document = DocumentHelper.parseText(driver.getPageSource());
         List<NodeInfo> nodeInfos = new ArrayList<>();
-        List<String> tabs = new ArrayList<>();
+        List<String> topTabs = new ArrayList<>();
+        //识别出页面中所有课点击的控件
         searchAllElementsClickable(document.getRootElement(), nodeInfos);
+        //遍历控件，识别出底部tabs
         List<String> bottomTabs = findBottomTabs(nodeInfos);
         for(NodeInfo node : nodeInfos){
-            String bounds = node.getBounds();
-            pageStack.push(new Page(curPackage, curActivity, nodeInfos));
-            tapUtils(bounds);
-            if(driver.getCurrentPackage().equals(curPackage) && driver.currentActivity().equals(curActivity)){
-                tabs.add(bounds);
+            tapUtils(node.getBounds());
+            String pkg = driver.getCurrentPackage();
+            String act = driver.currentActivity();
+            String prePackage = prePage == null ? null : prePage.getPackageName();
+            String preActivity = prePage == null ? null : prePage.getActivityName();
+            String preBounds = prePage == null ? null : prePage.getPreNodeInfo().getBounds();
+            if(act.toLowerCase().contains("login")){
+                driver.pressKey(new KeyEvent(AndroidKey.BACK));
                 continue;
             }
-            if(pageStack.size() < 3){
-                runMainPage();
-            }else{
-                driver.pressKey(new KeyEvent(AndroidKey.BACK));
-                Page page = pageStack.pop();
-                while(!(driver.getCurrentPackage().equals(page.getPackageName())
-                        && driver.currentActivity().equals(page.getActivityName()))){
-                    driver.pressKey(new KeyEvent(AndroidKey.BACK));
-                }
+            if(act.equals(curActivity) && pkg.equals(curPackage)){
+                topTabs.add(node.getBounds());
+            }else if(act.equals(preActivity) && pkg.equals(prePackage)){
+                tapUtils(preBounds);
+                continue;
             }
+            if(depth < 4){
+                runMainPage(new Page(curPackage, curActivity, node), depth++);
+            }
+            depth--;
+            driver.pressKey(new KeyEvent(AndroidKey.BACK));
+            while(!(driver.getCurrentPackage().equals(curPackage) && driver.currentActivity().equals(curActivity))){
+                driver.pressKey(new KeyEvent(AndroidKey.BACK));
+            }
+
         }
 
     }
@@ -140,12 +150,17 @@ public class AppiumClient {
     private void searchAllElementsClickable(Element element, List<NodeInfo> nodeInfoList){
         Iterator itr = element.elementIterator();
         while(itr.hasNext()){
-            searchAllElements((Element) itr.next(), nodeInfoList);
+            searchAllElementsClickable((Element) itr.next(), nodeInfoList);
         }
         String clickable = element.attributeValue("clickable");
         String bounds = element.attributeValue("bounds");
-        if(clickable != null && bounds != null)
-            nodeInfoList.add(new NodeInfo("", clickable, bounds, ""));
+        Attribute attr = element.attribute("resource-id");
+        String resource_id = "";
+        if(attr != null){
+            resource_id = attr.getValue();
+        }
+        if(clickable != null && bounds != null && clickable.equals("true") && !resource_id.contains("search"))
+            nodeInfoList.add(new NodeInfo("", clickable, bounds, resource_id));
     }
 
     private void runIntoMainPage() throws DocumentException, IOException, InterruptedException {
@@ -244,14 +259,10 @@ public class AppiumClient {
 
     private void skipProtocol(List<NodeInfo> nodeInfos){
         String[] inKeywords = {"同意", "继续", "知道了", "跳过", "逛逛"};
-        String[] outKeywords = {"不同意", "退出"};
+        String[] outKeywords = {"不同意", "退出", "暂不使用"};
         // String[] textKeywords = {"协议", "政策", "条款"};
         boolean isInButton = false;
         for(NodeInfo node : nodeInfos){
-            if(node.getResourceId().contains("close")){
-                tapUtils(node.getBounds());
-                break;
-            }
             if(node.getText().equals("跳过")){
                 tapUtils(node.getBounds());
                 break;
@@ -276,6 +287,10 @@ public class AppiumClient {
                 tapUtils(node.getBounds());
                 break;
             }
+            if(node.getResourceId().contains("close") || node.getResourceId().contains("cancel")){
+                tapUtils(node.getBounds());
+                break;
+            }
         }
 
     }
@@ -292,6 +307,7 @@ public class AppiumClient {
         PointOption pointOption = new PointOption();
         pointOption.withCoordinates(xOff,yOff);
         action.tap(pointOption).perform().release();
+        logger.info("点击" + xOff + "," + yOff);
     }
 
     private void givePermission(String pkgName) throws IOException {

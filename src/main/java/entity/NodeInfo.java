@@ -1,5 +1,7 @@
 package entity;
 
+import java.util.Objects;
+
 public class NodeInfo {
     private String text;
     private String clickable;
@@ -53,5 +55,21 @@ public class NodeInfo {
                 ", bounds='" + bounds + '\'' +
                 ", resourceId='" + resourceId + '\'' +
                 '}';
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        NodeInfo nodeInfo = (NodeInfo) o;
+        return Objects.equals(text, nodeInfo.text) &&
+                Objects.equals(clickable, nodeInfo.clickable) &&
+                Objects.equals(bounds, nodeInfo.bounds) &&
+                Objects.equals(resourceId, nodeInfo.resourceId);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(text, clickable, bounds, resourceId);
     }
 }
