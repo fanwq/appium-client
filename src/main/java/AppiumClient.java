@@ -64,46 +64,52 @@ public class AppiumClient {
         // 启动页面识别
         runIntoMainPage();
         //主页面识别
-        runMainPage(null, 0);
+        runMainPage();
 
     }
 
-    private void runMainPage(Page prePage, int depth) throws DocumentException {
-        String curActivity = driver.currentActivity();
-        String curPackage = driver.getCurrentPackage();
+    private void runMainPage() throws DocumentException, IOException, InterruptedException {
         Document document = DocumentHelper.parseText(driver.getPageSource());
         List<NodeInfo> nodeInfos = new ArrayList<>();
-        List<String> topTabs = new ArrayList<>();
         //识别出页面中所有课点击的控件
         searchAllElementsClickable(document.getRootElement(), nodeInfos);
         //遍历控件，识别出底部tabs
         List<String> bottomTabs = findBottomTabs(nodeInfos);
-        for(NodeInfo node : nodeInfos){
-            tapUtils(node.getBounds());
-            String pkg = driver.getCurrentPackage();
-            String act = driver.currentActivity();
-            String prePackage = prePage == null ? null : prePage.getPackageName();
-            String preActivity = prePage == null ? null : prePage.getActivityName();
-            String preBounds = prePage == null ? null : prePage.getPreNodeInfo().getBounds();
-            if(act.toLowerCase().contains("login")){
-                driver.pressKey(new KeyEvent(AndroidKey.BACK));
-                continue;
-            }
-            if(act.equals(curActivity) && pkg.equals(curPackage)){
-                topTabs.add(node.getBounds());
-            }else if(act.equals(preActivity) && pkg.equals(prePackage)){
-                tapUtils(preBounds);
-                continue;
-            }
-            if(depth < 4){
-                runMainPage(new Page(curPackage, curActivity, node), depth++);
-            }
-            depth--;
-            driver.pressKey(new KeyEvent(AndroidKey.BACK));
-            while(!(driver.getCurrentPackage().equals(curPackage) && driver.currentActivity().equals(curActivity))){
-                driver.pressKey(new KeyEvent(AndroidKey.BACK));
-            }
+        for(String botTab:bottomTabs){
+            adbTapUtils(botTab);
+            String curActivity = driver.currentActivity();
+            String curPackage = driver.getCurrentPackage();
+            document = DocumentHelper.parseText(driver.getPageSource());
+            nodeInfos = new ArrayList<>();
+            List<String> topTabs = new ArrayList<>();
+            //识别出页面中所有课点击的控件
+            searchAllElementsClickable(document.getRootElement(), nodeInfos);
+            findBottomTabs(nodeInfos);
+            for(NodeInfo node : nodeInfos){
+                tapUtils(node.getBounds());
+                String pkg = driver.getCurrentPackage();
+                String act = driver.currentActivity();
+                if(act.toLowerCase().contains("login")){
+                    Document doc = DocumentHelper.parseText(driver.getPageSource());
+                    List<NodeInfo> nodeInfoList = new ArrayList<>();
+                    //识别出页面中所有课点击的控件
+                    searchAllElements(doc.getRootElement(), nodeInfoList);
+                    skipProtocol(nodeInfoList);
+                    while(!(driver.getCurrentPackage().equals(curPackage) && driver.currentActivity().equals(curActivity))){
+                        driver.pressKey(new KeyEvent(AndroidKey.BACK));
+                        Thread.sleep(200);
+                    }
+                    continue;
+                }
+                if(act.equals(curActivity) && pkg.equals(curPackage)){
+                    topTabs.add(node.getBounds());
+                }
+                while(!(driver.getCurrentPackage().equals(curPackage) && driver.currentActivity().equals(curActivity))){
+                    driver.pressKey(new KeyEvent(AndroidKey.BACK));
+                    Thread.sleep(200);
+                }
 
+            }
         }
 
     }
@@ -154,13 +160,14 @@ public class AppiumClient {
         }
         String clickable = element.attributeValue("clickable");
         String bounds = element.attributeValue("bounds");
+        String text = element.attributeValue("text");
         Attribute attr = element.attribute("resource-id");
         String resource_id = "";
         if(attr != null){
             resource_id = attr.getValue();
         }
         if(clickable != null && bounds != null && clickable.equals("true") && !resource_id.contains("search"))
-            nodeInfoList.add(new NodeInfo("", clickable, bounds, resource_id));
+            nodeInfoList.add(new NodeInfo(text, clickable, bounds, resource_id));
     }
 
     private void runIntoMainPage() throws DocumentException, IOException, InterruptedException {
@@ -209,7 +216,7 @@ public class AppiumClient {
             }
         }
         if(count == 1) tapUtils(t_node.getBounds());
-        while(nodeInfos.size() <= 7){
+        while(nodeInfos.size() <= 20){
             String frontAct = driver.currentActivity();
             skipProtocol(nodeInfos);
             String backAct = driver.currentActivity();
@@ -257,9 +264,10 @@ public class AppiumClient {
         return nodeInfos;
     }
 
-    private void skipProtocol(List<NodeInfo> nodeInfos){
+    private void skipProtocol(List<NodeInfo> nodeInfos) throws InterruptedException {
         String[] inKeywords = {"同意", "继续", "知道了", "跳过", "逛逛"};
         String[] outKeywords = {"不同意", "退出", "暂不使用"};
+        String[] skipKeywords = {"close", "cancel", "skip"};
         // String[] textKeywords = {"协议", "政策", "条款"};
         boolean isInButton = false;
         for(NodeInfo node : nodeInfos){
@@ -269,14 +277,14 @@ public class AppiumClient {
             }
             boolean isOutButton = false;
             for(String outKeyword : outKeywords){
-                if(node.getClickable().equals("true") && node.getText().contains(outKeyword)){
+                if(node.getText().contains(outKeyword)){
                     isOutButton = true;
                     break;
                 }
             }
             if(isOutButton) continue;
             for(String inKeyword : inKeywords){
-                if(node.getClickable().equals("true") && node.getText().contains(inKeyword)
+                if(node.getText().contains(inKeyword)
                         && node.getText().length() < 15){
                     isInButton = true;
                     break;
@@ -287,15 +295,34 @@ public class AppiumClient {
                 tapUtils(node.getBounds());
                 break;
             }
-            if(node.getResourceId().contains("close") || node.getResourceId().contains("cancel")){
-                tapUtils(node.getBounds());
-                break;
+            for(String skipWord:skipKeywords){
+                if(node.getResourceId().contains(skipWord)){
+                    tapUtils(node.getBounds());
+                    break;
+                }
             }
+
         }
 
     }
 
-    private void tapUtils(String boundsString) {
+    private void tapUtils(String boundsString) throws InterruptedException {
+        String[] bounds = boundsString.substring(1, boundsString.length() - 1).replaceAll("]\\[", ",").split(",");
+        int xL = Integer.parseInt(bounds[0]);
+        int yL = Integer.parseInt(bounds[1]);
+        int xR = Integer.parseInt(bounds[2]);
+        int yR = Integer.parseInt(bounds[3]);
+        int xOff = Math.min((xL + xR) / 2, Integer.parseInt(this.phoneWidth) - 1);
+        int yOff = Math.min((yL + yR) / 2, Integer.parseInt(this.phoneHeight) - 1);
+        TouchAction action = new TouchAction(driver);
+        PointOption pointOption = new PointOption();
+        logger.info("点击" + xOff + "," + yOff);
+        pointOption.withCoordinates(xOff,yOff);
+        action.tap(pointOption).perform().release();
+        Thread.sleep(1000);
+    }
+
+    private void adbTapUtils(String boundsString) throws IOException, InterruptedException {
         String[] bounds = boundsString.substring(1, boundsString.length() - 1).replaceAll("]\\[", ",").split(",");
         int xL = Integer.parseInt(bounds[0]);
         int yL = Integer.parseInt(bounds[1]);
@@ -303,11 +330,9 @@ public class AppiumClient {
         int yR = Integer.parseInt(bounds[3]);
         int xOff = (xL + xR) / 2;
         int yOff = (yL + yR) / 2;
-        TouchAction action = new TouchAction(driver);
-        PointOption pointOption = new PointOption();
-        pointOption.withCoordinates(xOff,yOff);
-        action.tap(pointOption).perform().release();
-        logger.info("点击" + xOff + "," + yOff);
+        String command = "adb shell input tap " + xOff + " " + yOff;
+        Runtime.getRuntime().exec(command);
+        Thread.sleep(1000);
     }
 
     private void givePermission(String pkgName) throws IOException {
