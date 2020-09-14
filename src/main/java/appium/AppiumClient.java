@@ -1,3 +1,5 @@
+package appium;
+
 import entity.NodeInfo;
 import entity.Page;
 import io.appium.java_client.TouchAction;
@@ -18,15 +20,20 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Stack;
 import java.util.concurrent.TimeUnit;
 
-public class AppiumClient {
+public class AppiumClient implements Runnable {
     private static final Logger logger = LoggerFactory.getLogger(AppiumClient.class);
     private AndroidDriver<WebElement> driver = null;
-    private Stack<Page> pageStack = new Stack<>();
     private String phoneWidth;
     private String phoneHeight;
+    private final String pkgName;
+    private final Object lock;
+
+    public AppiumClient(String pkgName, Object lock) {
+        this.pkgName = pkgName;
+        this.lock = lock;
+    }
 
     private void connectAppiumServer() throws MalformedURLException {
         logger.info("正在连接appiumServer");
@@ -42,29 +49,38 @@ public class AppiumClient {
         logger.info("连接成功");
     }
 
-    public void run(String pkgName) throws IOException, InterruptedException, DocumentException {
-        String filePre = "D:\\appium-apk\\";
-        String pkgName1 = pkgName.split("_")[0];
-        // 连接server
-        connectAppiumServer();
-        // 安装app
-        logger.info("正在安装" + pkgName1);
-        driver.installApp(filePre + pkgName);
-        // adb赋权
-        givePermission(pkgName1);
-        //启动app
-        logger.info("启动" + pkgName1);
-        String command = "adb shell monkey -p " + pkgName1 + " -vvv 1";
-        Runtime.getRuntime().exec(command);
-        Thread.sleep(3000);
-        Document document = DocumentHelper.parseText(driver.getPageSource());
-        Element root = document.getRootElement();
-        phoneWidth = root.attributeValue("width");
-        phoneHeight = root.attributeValue("height");
-        // 启动页面识别
-        runIntoMainPage();
-        //主页面识别
-        runMainPage();
+    public void run() {
+        try{
+            String filePre = "D:\\appium-apk\\";
+            String pkgName1 = pkgName.split("_")[0];
+            synchronized(this.lock){
+                // 连接server
+                connectAppiumServer();
+                // 安装app
+                logger.info("正在安装" + pkgName1);
+                driver.installApp(filePre + pkgName);
+                // adb赋权
+                givePermission(pkgName1);
+                //启动app
+                logger.info("启动" + pkgName1);
+                String command = "adb shell monkey -p " + pkgName1 + " -vvv 1";
+                Runtime.getRuntime().exec(command);
+                System.out.println("appium wait");
+                this.lock.wait();
+            }
+            Thread.sleep(3000);
+            Document document = DocumentHelper.parseText(driver.getPageSource());
+            Element root = document.getRootElement();
+            phoneWidth = root.attributeValue("width");
+            phoneHeight = root.attributeValue("height");
+            // 启动页面识别
+            runIntoMainPage();
+            //主页面识别
+            runMainPage();
+        } catch (InterruptedException | IOException | DocumentException e) {
+            e.printStackTrace();
+        }
+
 
     }
 

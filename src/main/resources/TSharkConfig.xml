@@ -1,0 +1,7 @@
+<root>
+    <excludeurls>
+        <excludeurl>.*data.mistat.xiaomi.com.*</excludeurl>
+        <excludeurl>www.xiaomi.com</excludeurl>
+    </excludeurls>
+    <defaultinterface>2</defaultinterface>
+</root>

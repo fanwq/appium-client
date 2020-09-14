@@ -1,8 +1,13 @@
+import com.huaban.analysis.jieba.JiebaSegmenter;
 import entity.NodeInfo;
 import io.appium.java_client.android.Activity;
 import io.appium.java_client.android.AndroidDriver;
 import io.appium.java_client.android.nativekey.AndroidKey;
 import io.appium.java_client.android.nativekey.KeyEvent;
+import net.sourceforge.pinyin4j.PinyinHelper;
+import net.sourceforge.pinyin4j.format.HanyuPinyinOutputFormat;
+import net.sourceforge.pinyin4j.format.HanyuPinyinToneType;
+import net.sourceforge.pinyin4j.format.exception.BadHanyuPinyinOutputFormatCombination;
 import org.dom4j.*;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.remote.DesiredCapabilities;
@@ -16,21 +21,22 @@ import java.util.Stack;
 
 public class Test {
     private int loopNum = 0;
-    public static void main(String[] args) throws MalformedURLException, DocumentException {
-        AndroidDriver<WebElement> driver = null;
-        DesiredCapabilities capabilities = new DesiredCapabilities();
-        capabilities.setCapability("deviceName", "Mi 8 UD");
-        capabilities.setCapability("automationName", "Appium");
-        capabilities.setCapability("platformName", "Android");
-        capabilities.setCapability("platformVersion", "10.0");
-        driver = new AndroidDriver<>(new URL("http://127.0.0.1:4723/wd/hub"), capabilities);
-        System.out.println(driver.getPageSource());
-        Document document = DocumentHelper.parseText(driver.getPageSource());
-        Element element = document.getRootElement();
-        String width = element.attributeValue("width");
-        String height = element.attributeValue("height");
-        System.out.println(width + "," + height);
+    public static void main(String[] args) throws MalformedURLException, DocumentException, BadHanyuPinyinOutputFormatCombination {
+//        AndroidDriver<WebElement> driver = null;
+//        DesiredCapabilities capabilities = new DesiredCapabilities();
+//        capabilities.setCapability("deviceName", "Mi 8 UD");
+//        capabilities.setCapability("automationName", "Appium");
+//        capabilities.setCapability("platformName", "Android");
+//        capabilities.setCapability("platformVersion", "10.0");
+//        driver = new AndroidDriver<>(new URL("http://127.0.0.1:4723/wd/hub"), capabilities);
+//        System.out.println(driver.getPageSource());
+//        Document document = DocumentHelper.parseText(driver.getPageSource());
+//        Element element = document.getRootElement();
+//        String width = element.attributeValue("width");
+//        String height = element.attributeValue("height");
+//        System.out.println(width + "," + height);
 //        new Test().searchAllElements(element, nodeInfos);
+
     }
 
 
