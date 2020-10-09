@@ -1,24 +1,30 @@
 package tshark;
 
+import entity.ThreadFinish;
 import entity.URLInfo;
 import net.sourceforge.pinyin4j.format.exception.BadHanyuPinyinOutputFormatCombination;
 import org.dom4j.DocumentException;
 
 import java.io.*;
 import java.net.URL;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.regex.Pattern;
 
 public class TShark implements Runnable{
     private final String appName, pkgName;
     private final Object lock;
+    private ThreadFinish threadFinish;
 
-    public TShark(String appName, String pkgName, Object lock) {
+    public TShark(String appName, String pkgName, Object lock, ThreadFinish threadFinish) {
         this.appName = appName;
         this.pkgName = pkgName;
         this.lock = lock;
+        this.threadFinish = threadFinish;
     }
 
     @Override
@@ -26,10 +32,15 @@ public class TShark implements Runnable{
         try{
             TSharkConfig config = new TSharkConfig(appName, pkgName);
             config.config();
+            Date dNow = new Date();
+            SimpleDateFormat sdf = new SimpleDateFormat("HHmmss");
+            String dateString = sdf.format(dNow);
+            File oriFile = new File(appName+ dateString + ".txt");
+            File filFile = new File(appName + dateString + "-filtered.txt");
             BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(
-                    new FileOutputStream(new File(appName + ".txt")), StandardCharsets.UTF_8));
+                    new FileOutputStream(oriFile), StandardCharsets.UTF_8));
             BufferedWriter bw1 = new BufferedWriter(new OutputStreamWriter(
-                    new FileOutputStream(new File(appName + "-filtered.txt")), StandardCharsets.UTF_8));
+                    new FileOutputStream(filFile), StandardCharsets.UTF_8));
             BufferedReader br = null;
             List<String> excludeUrls = config.getExcludeUrls();
             List<String> rules = config.getRules();
@@ -40,7 +51,6 @@ public class TShark implements Runnable{
                 String command = "tshark -i " + interfaceString + " -Y \"http.request\" " +
                         "-T fields -e http.request.method -e http.user_agent -e http.request.full_uri -l";
                 p = Runtime.getRuntime().exec(command);
-                System.out.println("tshark notify");
                 this.lock.notify();
             }
             br = new BufferedReader(new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8));
@@ -67,7 +77,12 @@ public class TShark implements Runnable{
                 String[] param = line.split("\t");
                 String method = param[0];
                 String ua = param[1].replace("\n", "");
-                String url = param[2].replace("\n", "");;
+                String decodeUa = URLDecoder.decode(ua, "utf8");
+                String url = param[2].replace("\n", "");
+                String decodeUrl = URLDecoder.decode(url, "utf8");
+                if(url.startsWith("https://")){
+                    url = url.substring(8, url.indexOf('/', 8));
+                }
                 URLInfo model = new URLInfo(ua, url);
                 boolean isMatch = false;
                 for(String excludeUrl: excludeUrls){
@@ -77,8 +92,8 @@ public class TShark implements Runnable{
                 if(isMatch) continue;
                 boolean isFound = false;
                 for(String rule:rules){
-                    if(ua.contains(rule)) isFound = true;
-                    if(url.contains(rule)) isFound = true;
+                    if(decodeUa.toLowerCase().contains(rule)) isFound = true;
+                    if(decodeUrl.toLowerCase().contains(rule)) isFound = true;
                     boolean isExist = false;
                     if(isFound){
                         for(URLInfo info: urls){
@@ -89,16 +104,25 @@ public class TShark implements Runnable{
                             bw1.write(i + ".\n");
                             bw1.write(ua + "\n");
                             bw1.write(url + "\n");
+                            if(!ua.toLowerCase().contains(rule) && !ua.equals(decodeUa))
+                                bw1.write(decodeUa + "\n");
+                            if(!url.toLowerCase().contains(rule) && !url.equals(decodeUrl))
+                                bw1.write(decodeUrl);
                         }
                     }
                 }
                 bw.write(i + ".\n");
                 bw.write(ua + "\n");
                 bw.write(url + "\n");
-                System.out.println(ua);
-                System.out.println(url + "\n");
+//                System.out.println(decodeUa);
+//                System.out.println(decodeUrl + "\n");
+                if(threadFinish.isFinish())
+                    break;
                 i++;
             }
+            System.out.println("tshark循环跳出");
+            bw.close();
+            bw1.close();
         } catch (IOException | BadHanyuPinyinOutputFormatCombination | DocumentException e) {
             e.printStackTrace();
         }

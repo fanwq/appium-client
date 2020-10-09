@@ -12,7 +12,9 @@ import org.dom4j.io.SAXReader;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class TSharkConfig {
     private List<String> excludeUrls = new ArrayList<>();
@@ -36,20 +38,28 @@ public class TSharkConfig {
         for(Object element:excludeurls){
             excludeUrls.add(((Element)element).getText());
         }
-
-        String sent = appName.split("-")[0];
-        JiebaSegmenter segmenter = new JiebaSegmenter();
-        List<String> words = segmenter.sentenceProcess(sent);
-        rules.addAll(words);
+        Set<String> ruleSet = new HashSet<>();
         HanyuPinyinOutputFormat format = new HanyuPinyinOutputFormat();
         format.setToneType(HanyuPinyinToneType.WITHOUT_TONE);
+        String sent = appName.split("-")[0];
+        ruleSet.add(sent);
+        ruleSet.add(pkgName);
+        ruleSet.add(PinyinHelper.toHanYuPinyinString(sent, format, "", false));
+        ruleSet.add(getInitials(sent));
+        JiebaSegmenter segmenter = new JiebaSegmenter();
+        List<String> words = segmenter.sentenceProcess(sent);
+        ruleSet.addAll(words);
         for(String word : words){
             String ret = PinyinHelper.toHanYuPinyinString(word, format, "", false);
-            if(!ret.equals("") && ret.length() > 2)
-                rules.add(ret);
+            String initials = getInitials(word);
+            if(!ret.equals(""))
+                ruleSet.add(ret);
+            if(!initials.equals("") && initials.length() > 1)
+                ruleSet.add(initials);
         }
+        rules.addAll(ruleSet);
         String[] pkgWords = pkgName.split("\\.");
-        String[] nWords = {"android", "package", "com", "app", "cn"};
+        String[] nWords = {"android", "package", "com", "app", "cn", "ui"};
         for(String pkgWord:pkgWords){
             boolean isMatch = false;
             for(String nWord:nWords){
@@ -62,6 +72,18 @@ public class TSharkConfig {
             if(!rules.contains(pkgWord))
                 rules.add(pkgWord);
         }
+    }
+
+    private String getInitials(String word) throws BadHanyuPinyinOutputFormatCombination {
+        HanyuPinyinOutputFormat format = new HanyuPinyinOutputFormat();
+        format.setToneType(HanyuPinyinToneType.WITHOUT_TONE);
+        char[] chars = word.toCharArray();
+        StringBuilder sb = new StringBuilder();
+        for(char c : chars){
+            if(!(c > '0' && c < '9' || c > 'a' && c < 'z' || c > 'A' && c < 'Z'))
+                sb.append(PinyinHelper.toHanYuPinyinString(String.valueOf(c), format, "", false).toCharArray()[0]);
+        }
+        return sb.toString();
     }
 
     public List<String> getExcludeUrls() {

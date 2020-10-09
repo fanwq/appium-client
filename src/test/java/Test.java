@@ -9,33 +9,22 @@ import net.sourceforge.pinyin4j.format.HanyuPinyinOutputFormat;
 import net.sourceforge.pinyin4j.format.HanyuPinyinToneType;
 import net.sourceforge.pinyin4j.format.exception.BadHanyuPinyinOutputFormatCombination;
 import org.dom4j.*;
-import org.openqa.selenium.WebElement;
-import org.openqa.selenium.remote.DesiredCapabilities;
 
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Stack;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.util.*;
 
 public class Test {
     private int loopNum = 0;
-    public static void main(String[] args) throws MalformedURLException, DocumentException, BadHanyuPinyinOutputFormatCombination {
-//        AndroidDriver<WebElement> driver = null;
-//        DesiredCapabilities capabilities = new DesiredCapabilities();
-//        capabilities.setCapability("deviceName", "Mi 8 UD");
-//        capabilities.setCapability("automationName", "Appium");
-//        capabilities.setCapability("platformName", "Android");
-//        capabilities.setCapability("platformVersion", "10.0");
-//        driver = new AndroidDriver<>(new URL("http://127.0.0.1:4723/wd/hub"), capabilities);
-//        System.out.println(driver.getPageSource());
-//        Document document = DocumentHelper.parseText(driver.getPageSource());
-//        Element element = document.getRootElement();
-//        String width = element.attributeValue("width");
-//        String height = element.attributeValue("height");
-//        System.out.println(width + "," + height);
-//        new Test().searchAllElements(element, nodeInfos);
+    public static void main(String[] args) throws IOException {
+        String cmd = "adb devices";
+        Process p = Runtime.getRuntime().exec(cmd);
+        BufferedReader br = new BufferedReader(new InputStreamReader(p.getInputStream()));
+        String line;
+        while((line = br.readLine()) != null){
+            System.out.println(line);
+        }
 
     }
 

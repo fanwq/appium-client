@@ -44,7 +44,7 @@ public class ApkDownloader {
         }
         for(int i = 0; i < apkInfos.size(); i++){
             info = apkInfos.get(i);
-            if(searchName.equals(info.getAppName())){
+            if(searchName.equals(info.getAppName().split("-")[0].trim())){
                 return info;
             }
             tmpStr.append(i + 1).append(".").append(info.getAppName()).append("\n");
