@@ -34,11 +34,13 @@ public class AppiumClient implements Runnable {
     private final String pkgName;
     private final Object lock;
     private ThreadFinish threadFinish;
+    private boolean isFirstParse;
 
-    public AppiumClient(String pkgName, Object lock, ThreadFinish threadFinish) {
+    public AppiumClient(String pkgName, Object lock, ThreadFinish threadFinish, boolean isFirstParse) {
         this.pkgName = pkgName;
         this.lock = lock;
         this.threadFinish = threadFinish;
+        this.isFirstParse = isFirstParse;
     }
 
     private void connectAppiumServer() throws MalformedURLException {
@@ -56,16 +58,20 @@ public class AppiumClient implements Runnable {
             String pkgName1 = pkgName.split("_")[0];
             synchronized(this.lock){
                 // 连接appium
+                logger.info("正在连接appium...");
+                connectAppiumServer();
 //                logger.info("正在连接手机...");
 //                if(!connectAdb()){
 //                    logger.error("adb 连接失败！");
 //                    System.exit(-1);
 //                }
                 // 安装app
-                logger.info("正在安装" + pkgName1);
-                if(!installApp(filePre + pkgName)){
-                    logger.error("app安装失败");
-                    System.exit(-1);
+                if(isFirstParse){
+                    logger.info("正在安装" + pkgName1);
+                    if(!installApp(filePre + pkgName)){
+                        logger.error("app安装失败");
+                        System.exit(-1);
+                    }
                 }
                 //启动app
                 logger.info("启动" + pkgName1);
@@ -81,6 +87,8 @@ public class AppiumClient implements Runnable {
             logger.info("主页面识别");
             runMainPage(pkgName1);
             threadFinish.setFinish(true);
+            pressKey(AndroidKeyCode.HOME);
+            driver.quit();
             logger.info("appium结束");
         } catch (InterruptedException | IOException | DocumentException | ADBException e) {
             e.printStackTrace();
@@ -100,10 +108,15 @@ public class AppiumClient implements Runnable {
         return lineList;
     }
 
-    private void parseWidthAndHeight() throws IOException {
-        List<String> lineList = execAdbCmd("adb shell wm size");
-        phoneWidth = lineList.get(0).split(":")[1].trim().split("x")[0];
-        phoneWidth = lineList.get(0).split(":")[1].trim().split("x")[1];
+    private void parseWidthAndHeight() throws IOException, DocumentException {
+//        List<String> lineList = execAdbCmd("adb shell wm size");
+//        phoneWidth = lineList.get(0).split(":")[1].trim().split("x")[0];
+//        phoneHeight = lineList.get(0).split(":")[1].trim().split("x")[1];
+        String ps = driver.getPageSource();
+        Document document = DocumentHelper.parseText(ps);
+        Element element = document.getRootElement();
+        phoneWidth = element.attributeValue("width");
+        phoneHeight = element.attributeValue("height");
     }
 
     private boolean connectAdb() throws IOException {
@@ -121,29 +134,28 @@ public class AppiumClient implements Runnable {
         Runtime.getRuntime().exec(command);
     }
 
-    private String currentActivity() throws IOException, ADBException {
-        String command = "adb shell dumpsys window";
-        List<String> list = execAdbCmd(command);
-        System.out.println(list.toString());
-        for(String line:list){
-            if(line.contains("mCurrentFocus")){
-                return line.split(" ")[4].split("/")[1].split("}")[0];
-            }
-        }
-        throw new ADBException("获取当前activity失败");
-    }
+//    private String currentActivity() throws IOException, ADBException {
+//        String command = "adb shell dumpsys window";
+//        List<String> list = execAdbCmd(command);
+//        for(String line:list){
+//            if(line.contains("mCurrentFocus")){
+//                System.out.println(line);
+//                return line.split(" ")[4].split("/")[1].split("}")[0];
+//            }
+//        }
+//        throw new ADBException("获取当前activity失败");
+//    }
 
-    private String getCurrentPackage() throws IOException, ADBException {
-        String command = "adb shell dumpsys window";
-        List<String> list = execAdbCmd(command);
-        System.out.println(list.toString());
-        for(String line:list){
-            if(line.contains("mCurrentFocus")){
-                return line.split(" ")[4].split("/")[0];
-            }
-        }
-        throw new ADBException("获取当前package失败");
-    }
+//    private String getCurrentPackage() throws IOException, ADBException {
+//        String command = "adb shell dumpsys window";
+//        List<String> list = execAdbCmd(command);
+//        for(String line:list){
+//            if(line.contains("mCurrentFocus")){
+//                return line.split(" ")[4].split("/")[0];
+//            }
+//        }
+//        throw new ADBException("获取当前package失败");
+//    }
 
     private void pressKey(AndroidKeyCode key) throws IOException {
         execAdbCmd("adb shell input keyevent " + key.getCode());
@@ -152,7 +164,7 @@ public class AppiumClient implements Runnable {
     private void runMainPage(String pkgName1) throws DocumentException, IOException, InterruptedException, ADBException {
         pressKey(AndroidKeyCode.BACK);
         Thread.sleep(200);
-        if(currentActivity().equals(".launcher.Launcher") && getCurrentPackage().equals("com.miui.home")){
+        if(driver.currentActivity().equals(".launcher.Launcher") && driver.getCurrentPackage().equals("com.miui.home")){
             String command = "adb shell monkey -p " + pkgName1 + " -vvv 1";
             Runtime.getRuntime().exec(command);
             Thread.sleep(3000);
@@ -179,6 +191,7 @@ public class AppiumClient implements Runnable {
             //识别出页面中所有课点击的控件
             searchAllElementsClickable(document.getRootElement(), nodeInfos);
             findBottomTabs(nodeInfos);
+            String lastNodeBounds = "";
             for(NodeInfo node : nodeInfos){
                 tapUtils(node.getBounds());
                 String pkg = driver.getCurrentPackage();
@@ -195,11 +208,16 @@ public class AppiumClient implements Runnable {
                             break;
                         }
                     }
-                    if(!isWindow)
+                    if(!isWindow){
                         topTabs.add(node.getBounds());
+                        if(!lastNodeBounds.equals(""))
+                            tapUtils(lastNodeBounds);
+                    }
+                    lastNodeBounds = node.getBounds();
                 }
+                pressKey(AndroidKeyCode.BACK);
                 while(!(driver.getCurrentPackage().equals(curPackage) && driver.currentActivity().equals(curActivity))){
-                    driver.pressKey(new KeyEvent(AndroidKey.BACK));
+                    pressKey(AndroidKeyCode.BACK);
                     if(driver.currentActivity().equals(".launcher.Launcher") && driver.getCurrentPackage().equals("com.miui.home")){
                         String command = "adb shell monkey -p " + pkgName1 + " -vvv 1";
                         Runtime.getRuntime().exec(command);
@@ -212,7 +230,7 @@ public class AppiumClient implements Runnable {
 
     }
 
-    private boolean detectLoginPage(String curActivity, String curPackage) throws DocumentException, InterruptedException, IOException {
+    private boolean detectLoginPage(String curActivity, String curPackage) throws DocumentException, InterruptedException, IOException, ADBException {
         String activity = driver.currentActivity();
         if(activity.toLowerCase().contains("login")){
             Document doc = DocumentHelper.parseText(driver.getPageSource());
@@ -221,7 +239,7 @@ public class AppiumClient implements Runnable {
             searchAllElements(doc.getRootElement(), nodeInfoList);
             skipProtocol(nodeInfoList);
             while(!(driver.getCurrentPackage().equals(curPackage) && driver.currentActivity().equals(curActivity))){
-                driver.pressKey(new KeyEvent(AndroidKey.BACK));
+                pressKey(AndroidKeyCode.BACK);
                 Thread.sleep(200);
             }
             return true;
@@ -296,7 +314,7 @@ public class AppiumClient implements Runnable {
             nodeInfoList.add(new NodeInfo(text, clickable, bounds, resource_id));
     }
 
-    private void runIntoMainPage() throws DocumentException, IOException, InterruptedException {
+    private void runIntoMainPage() throws DocumentException, IOException, InterruptedException, ADBException {
         if(!preSkipProtocol()) return;
         swipProduction();
         if(!preSkipProtocol()) return;
@@ -304,7 +322,7 @@ public class AppiumClient implements Runnable {
             logger.info("识别到登录页，尝试通过返回键进入主界面");
             driver.hideKeyboard();
             String curPkg = driver.getCurrentPackage();
-            driver.pressKey(new KeyEvent(AndroidKey.BACK));
+            pressKey(AndroidKeyCode.BACK);
             if(driver.getCurrentPackage().equals("com.miui.home") && driver.currentActivity().equals(".launcher.Launcher")){
                 logger.info("失败，重新打开app");
                 String command = "adb shell monkey -p " + curPkg + " -vvv 1";
@@ -329,7 +347,7 @@ public class AppiumClient implements Runnable {
         }
     }
 
-    private boolean preSkipProtocol() throws DocumentException, InterruptedException, IOException {
+    private boolean preSkipProtocol() throws DocumentException, InterruptedException, IOException, ADBException {
         List<NodeInfo> nodeInfos;
         int count = 0;
         NodeInfo t_node = null;
@@ -440,13 +458,13 @@ public class AppiumClient implements Runnable {
         int yR = Integer.parseInt(bounds[3]);
         int xOff = (xL + xR) / 2;
         int yOff = (yL + yR) / 2;
+        logger.info("点击" + xOff + "," + yOff);
         if(xOff >= Integer.parseInt(this.phoneWidth) || yOff >= Integer.parseInt(this.phoneHeight)){
             String command = "adb shell input tap " + xOff + " " + yOff;
             Runtime.getRuntime().exec(command);
         }else{
             TouchAction action = new TouchAction(driver);
             PointOption pointOption = new PointOption();
-            logger.info("点击" + xOff + "," + yOff);
             pointOption.withCoordinates(xOff,yOff);
             action.tap(pointOption).perform().release();
         }

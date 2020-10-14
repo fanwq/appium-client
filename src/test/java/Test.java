@@ -9,31 +9,41 @@ import net.sourceforge.pinyin4j.format.HanyuPinyinOutputFormat;
 import net.sourceforge.pinyin4j.format.HanyuPinyinToneType;
 import net.sourceforge.pinyin4j.format.exception.BadHanyuPinyinOutputFormatCombination;
 import org.dom4j.*;
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.remote.DesiredCapabilities;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.URL;
 import java.util.*;
 
 public class Test {
     private int loopNum = 0;
-    public static void main(String[] args) throws IOException {
-        String cmd = "adb devices";
-        Process p = Runtime.getRuntime().exec(cmd);
-        BufferedReader br = new BufferedReader(new InputStreamReader(p.getInputStream()));
-        String line;
-        while((line = br.readLine()) != null){
-            System.out.println(line);
-        }
+    public static void main(String[] args) throws IOException, DocumentException {
+        DesiredCapabilities desiredCapabilities = new DesiredCapabilities();
+        desiredCapabilities.setCapability("deviceName", "Mi 8 UD");
+        desiredCapabilities.setCapability("platformName", "Android");
+        desiredCapabilities.setCapability("platformVersion", "10.0");
+        desiredCapabilities.setCapability("newCommandTimeout", 3600);
+        AndroidDriver<WebElement> driver = new AndroidDriver(new URL("http://127.0.0.1:4723/wd/hub"),desiredCapabilities);
+        String ps = driver.getPageSource();
+        System.out.println(ps);
+        Document document = DocumentHelper.parseText(ps);
+        Element element = document.getRootElement();
+        String width = element.attributeValue("width");
+        String height = element.attributeValue("height");
+        System.out.println(width);
+        System.out.println(height);
+        List<NodeInfo> nodeInfos = new ArrayList<>();
+        //searchAllElements(document.getRootElement(),nodeInfos);
 
     }
 
 
-    private void searchAllElements(Element element, List<NodeInfo> nodeInfoList){
+    private static void searchAllElements(Element element, List<NodeInfo> nodeInfoList){
         Iterator itr = element.elementIterator();
         while(itr.hasNext()){
-            loopNum++;
-            System.out.println(loopNum);
             searchAllElements((Element) itr.next(), nodeInfoList);
         }
         Attribute attr = element.attribute("text");

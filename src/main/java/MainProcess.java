@@ -14,14 +14,15 @@ public class MainProcess {
     private static final Object lock = new Object();
     private static ThreadFinish isFinish = new ThreadFinish(false);
     public static void main(String[] args) throws IOException {
-        String appName = "蚂蚁借款";
+        boolean firstParse = false;
+        String appName = "富途牛牛";
         ApkDownloader apkDownloader = new ApkDownloader();
         String pkgName = apkDownloader.downloadApk(appName);
         if(pkgName.equals("")){
             logger.error("下载" + pkgName + "失败");
             System.exit(-1);
         }else{
-            AppiumClient client = new AppiumClient(pkgName, lock, isFinish);
+            AppiumClient client = new AppiumClient(pkgName, lock, isFinish, firstParse);
             Thread thread1 = new Thread(client);
             thread1.start();
         }

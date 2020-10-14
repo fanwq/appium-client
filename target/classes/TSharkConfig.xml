@@ -4,5 +4,5 @@
         <excludeurl>www.xiaomi.com</excludeurl>
         <excludeurl>http://239.255.255.250:1900.*</excludeurl>
     </excludeurls>
-    <defaultinterface>2</defaultinterface>
+    <defaultinterface>3</defaultinterface>
 </root>
