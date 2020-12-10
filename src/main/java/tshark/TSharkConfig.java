@@ -48,18 +48,20 @@ public class TSharkConfig {
         ruleSet.add(getInitials(sent));
         JiebaSegmenter segmenter = new JiebaSegmenter();
         List<String> words = segmenter.sentenceProcess(sent);
-        ruleSet.addAll(words);
         for(String word : words){
-            String ret = PinyinHelper.toHanYuPinyinString(word, format, "", false);
-            String initials = getInitials(word);
-            if(!ret.equals(""))
-                ruleSet.add(ret);
-            if(!initials.equals("") && initials.length() > 1)
-                ruleSet.add(initials);
+            if(word.length() > 1){
+                ruleSet.add(word);
+                String ret = PinyinHelper.toHanYuPinyinString(word, format, "", false);
+                String initials = getInitials(word);
+                if(!ret.equals(""))
+                    ruleSet.add(ret);
+                if(!initials.equals("") && initials.length() > 1)
+                    ruleSet.add(initials);
+            }
         }
         rules.addAll(ruleSet);
         String[] pkgWords = pkgName.split("\\.");
-        String[] nWords = {"android", "package", "com", "app", "cn", "ui"};
+        String[] nWords = {"android", "package", "com", "app", "cn", "ui", "mobile", "client"};
         for(String pkgWord:pkgWords){
             boolean isMatch = false;
             for(String nWord:nWords){

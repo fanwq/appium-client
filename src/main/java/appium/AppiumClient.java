@@ -1,6 +1,6 @@
 package appium;
 
-import com.sun.org.apache.xpath.internal.operations.Bool;
+
 import entity.NodeInfo;
 import entity.ThreadFinish;
 import enum1.AndroidKeyCode;
@@ -8,8 +8,6 @@ import exception.ADBException;
 import io.appium.java_client.TouchAction;
 
 import io.appium.java_client.android.AndroidDriver;
-import io.appium.java_client.android.nativekey.AndroidKey;
-import io.appium.java_client.android.nativekey.KeyEvent;
 import io.appium.java_client.touch.offset.PointOption;
 import org.dom4j.*;
 import org.openqa.selenium.WebElement;
@@ -184,6 +182,7 @@ public class AppiumClient implements Runnable {
             tapUtils(botTab);
             String curActivity = driver.currentActivity();
             String curPackage = driver.getCurrentPackage();
+            logger.info("base:" + curActivity + "," + curPackage);
             if (detectLoginPage(curActivity, curPackage)) continue;
             document = DocumentHelper.parseText(driver.getPageSource());
             nodeInfos = new ArrayList<>();
@@ -191,11 +190,11 @@ public class AppiumClient implements Runnable {
             //识别出页面中所有课点击的控件
             searchAllElementsClickable(document.getRootElement(), nodeInfos);
             findBottomTabs(nodeInfos);
-            String lastNodeBounds = "";
             for(NodeInfo node : nodeInfos){
                 tapUtils(node.getBounds());
                 String pkg = driver.getCurrentPackage();
                 String act = driver.currentActivity();
+                logger.info("tap:" + act + "," + pkg);
                 if (detectLoginPage(curActivity, curPackage)) continue;
                 if(act.equals(curActivity) && pkg.equals(curPackage)){
                     List<NodeInfo> tempInfos = new ArrayList<>();
@@ -209,11 +208,10 @@ public class AppiumClient implements Runnable {
                         }
                     }
                     if(!isWindow){
-                        topTabs.add(node.getBounds());
-                        if(!lastNodeBounds.equals(""))
-                            tapUtils(lastNodeBounds);
+                        String bounds = dealTopTabs(topTabs, node.getBounds());
+                        if(!bounds.equals(""))
+                            tapUtils(bounds);
                     }
-                    lastNodeBounds = node.getBounds();
                 }
                 pressKey(AndroidKeyCode.BACK);
                 while(!(driver.getCurrentPackage().equals(curPackage) && driver.currentActivity().equals(curActivity))){
@@ -228,6 +226,25 @@ public class AppiumClient implements Runnable {
             }
         }
 
+    }
+
+    private String dealTopTabs(List<String> topTabs, String bounds){
+        if(topTabs.size() == 0){
+            topTabs.add(bounds);
+            return "";
+        }
+        String lastBounds = topTabs.get(topTabs.size() - 1);
+        String[] tList = lastBounds.replace("[", "").replace("]", ",").split(",");
+        String tStr1 = tList[1] + "," + tList[3];
+        tList = bounds.replace("[", "").replace("]", ",").split(",");
+        String tStr2 = tList[1] + "," + tList[3];
+        if(tStr1.equals(tStr2)){
+            topTabs.add(bounds);
+        }else{
+            topTabs.clear();
+            topTabs.add(bounds);
+        }
+        return topTabs.get(0);
     }
 
     private boolean detectLoginPage(String curActivity, String curPackage) throws DocumentException, InterruptedException, IOException, ADBException {
@@ -334,11 +351,13 @@ public class AppiumClient implements Runnable {
 
     private void swipProduction() throws InterruptedException, DocumentException, IOException {
         Thread.sleep(3000);
+        logger.info("划动函数");
         List<NodeInfo> nodeInfos = parsePageSourceWithoutDetect();
         skipProtocol(nodeInfos);
         while(nodeInfos == null || nodeInfos.size() == 0 || nodeInfos.size() == 1){
             if(nodeInfos == null || nodeInfos.size() == 0){
                 SwipUtils.SwipeLeft(driver);
+                logger.info("划");
             } else{
                 tapUtils(nodeInfos.get(0).getBounds());
                 break;
@@ -411,7 +430,7 @@ public class AppiumClient implements Runnable {
     private void skipProtocol(List<NodeInfo> nodeInfos) throws InterruptedException, IOException {
         String[] inKeywords = {"同意", "继续", "知道了", "跳过", "逛逛"};
         String[] outKeywords = {"不同意", "退出", "暂不使用"};
-        String[] skipKeywords = {"close", "cancel", "skip"};
+        String[] skipKeywords = {"close", "cancel", "skip", "del", "delete"};
         // String[] textKeywords = {"协议", "政策", "条款"};
         boolean isInButton = false;
         for(NodeInfo node : nodeInfos){

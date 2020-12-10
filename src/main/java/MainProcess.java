@@ -15,7 +15,7 @@ public class MainProcess {
     private static ThreadFinish isFinish = new ThreadFinish(false);
     public static void main(String[] args) throws IOException {
         boolean firstParse = false;
-        String appName = "富途牛牛";
+        String appName = "唯品会";
         ApkDownloader apkDownloader = new ApkDownloader();
         String pkgName = apkDownloader.downloadApk(appName);
         if(pkgName.equals("")){
@@ -26,9 +26,6 @@ public class MainProcess {
             Thread thread1 = new Thread(client);
             thread1.start();
         }
-
-//        appium.AppiumClient client = new appium.AppiumClient();
-//        client.run("com.tencent.news_6.2.30_6230.apk");
         TShark tShark = new TShark(appName, pkgName.split("_")[0], lock, isFinish);
         Thread thread2 = new Thread(tShark);
         thread2.start();

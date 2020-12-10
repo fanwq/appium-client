@@ -33,10 +33,10 @@ public class TShark implements Runnable{
             TSharkConfig config = new TSharkConfig(appName, pkgName);
             config.config();
             Date dNow = new Date();
-            SimpleDateFormat sdf = new SimpleDateFormat("HHmmss");
+            SimpleDateFormat sdf = new SimpleDateFormat("_dd_HH_mm");
             String dateString = sdf.format(dNow);
             File oriFile = new File(appName+ dateString + ".txt");
-            File filFile = new File(appName + dateString + "-filtered.txt");
+            File filFile = new File(appName + dateString + "_f.txt");
             BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(
                     new FileOutputStream(oriFile), StandardCharsets.UTF_8));
             BufferedWriter bw1 = new BufferedWriter(new OutputStreamWriter(
